@@ -11,7 +11,6 @@ import torch.nn.functional as F
 import random
 
 
-
 class Encoder(nn.Module):
     def __init__(self, input_size, embed_size, hidden_size, batch_size, n_layers=1, dropout=0.5):
         super(Encoder, self).__init__()
@@ -21,7 +20,6 @@ class Encoder(nn.Module):
         self.embedding = nn.Embedding(input_size, embed_size)
         self.gru = nn.GRU(embed_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
 
-
     def forward(self, input, hidden):
         # hidden: [n_layers * num_dir, B, H]
         # [L, B] -> [L, B, E]
@@ -30,7 +28,6 @@ class Encoder(nn.Module):
         output, hidden = self.gru(embedded, hidden)
         # output = output[:, :, :self.hidden_size] + output[:, :, self.hidden_size]
         return output, hidden
-
 
     def init_hidden(self):
         return torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size)
@@ -44,35 +41,33 @@ class AttentionDecoder(nn.Module):
         self.output_size = output_size
         self.embedding = nn.Embedding(output_size, embed_size)
         self.attention = nn.Linear(hidden_size * 2 + hidden_size, hidden_size)
-        self.v = torch.randn(hidden_size, requirew_grad=True)
+        self.v = torch.randn(hidden_size, requires_grad=True)
         self.attention_combined = nn.Linear(hidden_size * 2 + embed_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size)
+        self.gru = nn.GRU(hidden_size, hidden_size, dropout=dropout)
         self.out_layer = nn.Linear(hidden_size * 3 + embed_size, output_size)
-
 
     def forward(self, input, hidden, encoder_outputs):
         time_steps = encoder_outputs.size(0)
         # [1, B] -> [1, B, E]
-        embedded = self.embedding(input)
+        embedded = self.embedding(input.unsqueeze(0))
         # [1, B, H] -> [L, B, H]
         h = hidden.repeat(time_steps, 1, 1)
         # [H] -> [L, H, 1]
-        v = self.v.repeat(time_steps, 1).unsqueeze(1)
+        v = self.v.repeat(time_steps, 1).unsqueeze(2)
         # [L, B, 3H] -> [L, B, H] * [L, H, 1] = [L, B, 1] -> [L, B]
         energies = self.attention(torch.cat((h, encoder_outputs), 2)).bmm(v).squeeze(2)
         # [L, B]
         attn_weights = F.softmax(energies, dim=0)
-        # [L, B] -> [B, 1, L] * [B, L, 2H] = [B, 1, 2H] -> [1, B, 2H]
+        # [L, B] -> [B, 1, L] * [B, L, 2H] = [B, 1, 2H]
         context = attn_weights.transpose(0, 1).unsqueeze(1).bmm(encoder_outputs.transpose(0,1))
         # [1, B, 2H + E] -> [1, B, H]
         attn_combined = self.attention_combined(torch.cat((context.transpose(0, 1), embedded), 2))
         # [1, B, H], [1, B, H]
         _, hidden_i = self.gru(attn_combined, hidden)
         # [1, B, 3H + E] -> [1, B, O] -> [B, O]
-        output = self.out_layer(torch.cat((hidden, embedded, context), 2)).squeeze(0)
+        output = self.out_layer(torch.cat((hidden, embedded, context.transpose(0, 1)), 2)).squeeze(0)
         output = F.log_softmax(output, dim=1)
         return output, hidden_i
-
 
     def init_hidden(self):
         return torch.zeros(1, self.batch_size, self.hidden_size)
@@ -84,15 +79,14 @@ class Seq2Seq(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-
     def forward(self, input, output, teacher_forcing_ratio=0.5):
         batch_size = input.size(1)
         max_len = output.size(0)
         vocab_size = self.decoder.output_size
         outputs = torch.zeros(max_len, batch_size, vocab_size)
 
-        encoder_outputs, hidden = self.encoder(input)
-        hidden = hidden[0, :, :] + hidden[1, :, :]
+        encoder_outputs, hidden = self.encoder(input, self.encoder.init_hidden())
+        hidden = (hidden[0, :, :] + hidden[1, :, :]).unsqueeze(0)
         decoder_input = output[0,:] # SOS_TOKEN
 
         for t in range(1, max_len):
@@ -100,6 +94,7 @@ class Seq2Seq(nn.Module):
             outputs[t] = decoder_output
             is_teacher = random.random() < teacher_forcing_ratio
             _, top1 = decoder_output.topk(1)
+            top1.squeeze_()
             decoder_input = output[t, :] if is_teacher else top1
 
         return outputs
