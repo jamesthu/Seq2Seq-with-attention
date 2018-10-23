@@ -11,9 +11,8 @@ from torch import optim
 import torch
 from torch.nn.utils import clip_grad_norm
 from model import Encoder, AttentionDecoder, Seq2Seq
-from utils import load_dataset
+from utils import load_dataset, device
 
-device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
 def parse_arguments():
     p = argparse.ArgumentParser(description='Hyperparams')
@@ -31,8 +30,8 @@ def train(model, optimizer, train_iter, vocab_size, grad_clip, DE, EN):
     for index, batch in enumerate(train_iter):
         src, len_src = batch.src
         trg, len_trg = batch.trg
-        src = src.cuda()
-        trg = trg.cuda()
+        src = src.to(device)
+        trg = trg.to(device)
         optimizer.zero_grad()
         output = model(src, trg)
         loss = F.nll_loss(output[1:].view(-1, vocab_size), trg[1:].contiguous().view(-1), ignore_index=pad)
@@ -54,8 +53,8 @@ def evaluate(model, val_iter, vocab_size, DE, EN):
     for index, batch in enumerate(val_iter):
         src, len_src = batch.src
         trg, len_trg = batch.trg
-        src = src.cuda()
-        trg = trg.cuda()
+        src = src.to(device)
+        trg = trg.to(device)
         output = model(src, trg, teacher_forcing_ratio=0)
         loss = F.nll_loss(output[1:].view(-1, vocab_size), trg[1:].contiguous().view(-1), ignore_index=pad)
         total_loss += loss.item()
@@ -71,5 +70,11 @@ if __name__ == "__main__":
     print('Loading dataset ......')
     train_iter, val_iter, test_iter, DE, EN = load_dataset(args.batch_size)
     de_size, en_size = len(DE.vocab), len(EN.vocab)
-    print()
+
+    print("Initialize model ......")
+    encoder = Encoder(de_size, embed_size, hidden_size, args.batch_size)
+    decoder = AttentionDecoder(en_size, embed_size, hidden_size, args.batch_size)
+    seq2seq = Seq2Seq(encoder, decoder).to(device)
+
+
 

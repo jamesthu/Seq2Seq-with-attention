@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
+from utils import device
 
 
 class Encoder(nn.Module):
@@ -30,7 +31,7 @@ class Encoder(nn.Module):
         return output, hidden
 
     def init_hidden(self):
-        return torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size)
+        return torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size).to(device)
 
 
 class AttentionDecoder(nn.Module):
@@ -41,7 +42,7 @@ class AttentionDecoder(nn.Module):
         self.output_size = output_size
         self.embedding = nn.Embedding(output_size, embed_size)
         self.attention = nn.Linear(hidden_size * 2 + hidden_size, hidden_size)
-        self.v = torch.randn(hidden_size, requires_grad=True)
+        self.v = torch.randn(hidden_size, requires_grad=True).to(device)
         self.attention_combined = nn.Linear(hidden_size * 2 + embed_size, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size, dropout=dropout)
         self.out_layer = nn.Linear(hidden_size * 3 + embed_size, output_size)
@@ -70,7 +71,7 @@ class AttentionDecoder(nn.Module):
         return output, hidden_i
 
     def init_hidden(self):
-        return torch.zeros(1, self.batch_size, self.hidden_size)
+        return torch.zeros(1, self.batch_size, self.hidden_size).to(device)
 
 
 class Seq2Seq(nn.Module):
@@ -83,11 +84,11 @@ class Seq2Seq(nn.Module):
         batch_size = input.size(1)
         max_len = output.size(0)
         vocab_size = self.decoder.output_size
-        outputs = torch.zeros(max_len, batch_size, vocab_size)
+        outputs = torch.zeros(max_len, batch_size, vocab_size).to(device)
 
         encoder_outputs, hidden = self.encoder(input, self.encoder.init_hidden())
         hidden = (hidden[0, :, :] + hidden[1, :, :]).unsqueeze(0)
-        decoder_input = output[0,:] # SOS_TOKEN
+        decoder_input = output[0, :]  # SOS_TOKEN
 
         for t in range(1, max_len):
             decoder_output, hidden = self.decoder(decoder_input, hidden, encoder_outputs)

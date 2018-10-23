@@ -9,6 +9,8 @@ import spacy
 from torchtext.data import Field, BucketIterator
 from torchtext.datasets import Multi30k
 
+device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+
 
 def load_dataset(batch_size):
     spacy_de = spacy.load('de')
