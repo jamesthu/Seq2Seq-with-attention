@@ -13,15 +13,14 @@ from utils import device
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, embed_size, hidden_size, batch_size, n_layers=1, dropout=0.5):
+    def __init__(self, input_size, embed_size, hidden_size, n_layers=1, dropout=0.5):
         super(Encoder, self).__init__()
         self.n_layers = n_layers
-        self.batch_size = batch_size
         self.hidden_size = hidden_size
         self.embedding = nn.Embedding(input_size, embed_size)
         self.gru = nn.GRU(embed_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
 
-    def forward(self, input, hidden):
+    def forward(self, input, hidden=None):
         # hidden: [n_layers * num_dir, B, H]
         # [L, B] -> [L, B, E]
         embedded = self.embedding(input)
@@ -30,15 +29,11 @@ class Encoder(nn.Module):
         # output = output[:, :, :self.hidden_size] + output[:, :, self.hidden_size]
         return output, hidden
 
-    def init_hidden(self):
-        return torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size).to(device)
-
 
 class AttentionDecoder(nn.Module):
-    def __init__(self, output_size, embed_size, hidden_size, batch_size, dropout=0.2):
+    def __init__(self, output_size, embed_size, hidden_size, dropout=0.2):
         super(AttentionDecoder, self).__init__()
         self.hidden_size = hidden_size
-        self.batch_size = batch_size
         self.output_size = output_size
         self.embedding = nn.Embedding(output_size, embed_size)
         self.attention = nn.Linear(hidden_size * 2 + hidden_size, hidden_size)
@@ -70,8 +65,6 @@ class AttentionDecoder(nn.Module):
         output = F.log_softmax(output, dim=1)
         return output, hidden_i
 
-    def init_hidden(self):
-        return torch.zeros(1, self.batch_size, self.hidden_size).to(device)
 
 
 class Seq2Seq(nn.Module):
@@ -86,7 +79,7 @@ class Seq2Seq(nn.Module):
         vocab_size = self.decoder.output_size
         outputs = torch.zeros(max_len, batch_size, vocab_size).to(device)
 
-        encoder_outputs, hidden = self.encoder(input, self.encoder.init_hidden())
+        encoder_outputs, hidden = self.encoder(input)
         hidden = (hidden[0, :, :] + hidden[1, :, :]).unsqueeze(0)
         decoder_input = output[0, :]  # SOS_TOKEN
 
