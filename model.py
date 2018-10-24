@@ -87,7 +87,7 @@ class Seq2Seq(nn.Module):
             outputs[t] = decoder_output
             is_teacher = random.random() < teacher_forcing_ratio
             _, top1 = decoder_output.topk(1)
-            top1.squeeze_()
+            top1.squeeze_(1)
             decoder_input = output[t, :] if is_teacher else top1
 
         return outputs
