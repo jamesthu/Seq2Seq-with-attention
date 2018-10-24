@@ -6,7 +6,7 @@ Seq2Seq model with attention to translate German to English.
 - Python 3.6
 - Pytorch 0.4.0
 - spacy
-- torchtext
+- torchtext 0.3.1
 
 ## Dataset
 
