@@ -14,7 +14,7 @@ from torch import optim
 import torch
 from torch.nn.utils import clip_grad_norm
 from model import Encoder, AttentionDecoder, Seq2Seq
-from utils import load_dataset, device
+from utils import load_dataset, device, tokenize_de, tokenize_en
 
 start_time = time.time()
 
@@ -67,6 +67,31 @@ def evaluate(model, val_iter, vocab_size, DE, EN):
         loss = F.nll_loss(output[1:].view(-1, vocab_size), trg[1:].contiguous().view(-1), ignore_index=pad)
         total_loss += loss.item()
         return total_loss / len(val_iter)
+
+
+def online_translator(model, model_save_path, DE, EN):
+    model.load_state_dict(torch.load(model_save_path))
+    while True:
+        s_de = input("Please input a german sentence:")
+        if s_de == 'quit':
+            break
+        else:
+            de_list = ['<sos>'] + tokenize_de(s_de) + ['<eos>']
+            input_de = []
+            for de_i in de_list:
+                input_de.append(DE.vocab.stoi[de_i])
+            input_de = torch.Tensor(input_de).unsqueeze(1).long().to(device)
+            model.eval()
+            output_en = model(input_de, input_de, teacher_forcing_ratio=0)
+            output_en.squeeze_()
+            s_en = ''
+            pad = EN.vocab.stoi["<pad>"]
+            for en_i in output_en:
+                _, top1 = en_i.topk(1)
+                if top1.item() == pad:
+                    continue
+                s_en += EN.vocab.itos[top1.item()] + ' '
+            print("Translation result in English: {}".format(s_en))
 
 
 if __name__ == "__main__":

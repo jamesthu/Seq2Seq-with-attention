@@ -11,17 +11,11 @@ from torchtext.data import Field, BucketIterator
 from torchtext.datasets import Multi30k
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
+spacy_de = spacy.load('de')
+spacy_en = spacy.load('en')
 
 
 def load_dataset(batch_size):
-    spacy_de = spacy.load('de')
-    spacy_en = spacy.load('en')
-
-    def tokenize_de(text):
-        return [tok.text for tok in spacy_de.tokenizer(text)]
-
-    def tokenize_en(text):
-        return [tok.text for tok in spacy_en.tokenizer(text)]
 
     DE = Field(tokenize=tokenize_de, include_lengths=True,
                init_token='<sos>', eos_token='<eos>')
@@ -34,3 +28,10 @@ def load_dataset(batch_size):
         (train, val, test), batch_size=batch_size, repeat=False)
     return train_iter, val_iter, test_iter, DE, EN
 
+
+def tokenize_de(text):
+    return [tok.text for tok in spacy_de.tokenizer(text)]
+
+
+def tokenize_en(text):
+    return [tok.text for tok in spacy_en.tokenizer(text)]
