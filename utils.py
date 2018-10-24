@@ -34,6 +34,3 @@ def load_dataset(batch_size):
         (train, val, test), batch_size=batch_size, repeat=False)
     return train_iter, val_iter, test_iter, DE, EN
 
-# a = load_dataset(32)
-# for i in a[0]:
-#     print(i)
