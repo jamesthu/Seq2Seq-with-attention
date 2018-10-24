@@ -6,12 +6,17 @@ Created on 2018/10/23
 '''
 
 import argparse
+import os
+import math
+import time
 import torch.nn.functional as F
 from torch import optim
 import torch
 from torch.nn.utils import clip_grad_norm
 from model import Encoder, AttentionDecoder, Seq2Seq
 from utils import load_dataset, device
+
+start_time = time.time()
 
 
 def parse_arguments():
@@ -42,7 +47,10 @@ def train(model, optimizer, train_iter, vocab_size, grad_clip, DE, EN):
 
         if index % 100 == 0 and index != 0:
             total_loss = total_loss / 100
-            print("{} [Loss: %5.2f]".format(index, total_loss))
+            now_time = time.time()
+            print("{} [Loss: {}] [Time: {}h{}m{}s]"
+                  .format(index, total_loss, (now_time - start_time) // 3600,
+                  (now_time - start_time) % 3600 // 60, (now_time - start_time) % 60))
             total_loss = 0
 
 
@@ -65,16 +73,37 @@ if __name__ == "__main__":
     args = parse_arguments()
     hidden_size = 512
     embed_size = 256
-    assert torch.cuda.is_available()
+    print(device)
 
     print('Loading dataset ......')
     train_iter, val_iter, test_iter, DE, EN = load_dataset(args.batch_size)
     de_size, en_size = len(DE.vocab), len(EN.vocab)
+    print("[TRAIN]:%d (dataset:%d)\t[TEST]:%d (dataset:%d)\t[VALUATE]:%d (dataset:%d)"
+          % (len(train_iter), len(train_iter.dataset),
+             len(test_iter), len(test_iter.dataset),
+             len(val_iter), len(val_iter.dataset)))
+    print("[DE_vocab]:%d [en_vocab]:%d" % (de_size, en_size))
 
     print("Initialize model ......")
-    encoder = Encoder(de_size, embed_size, hidden_size, args.batch_size)
-    decoder = AttentionDecoder(en_size, embed_size, hidden_size, args.batch_size)
+    encoder = Encoder(de_size, embed_size, hidden_size)
+    decoder = AttentionDecoder(en_size, embed_size, hidden_size)
     seq2seq = Seq2Seq(encoder, decoder).to(device)
+    optimizer = optim.Adam(seq2seq.parameters(), lr=args.lr)
+    print(seq2seq)
 
+    best_val_loss = None
+    for epoch in range(0, args.epochs):
+        train(seq2seq, optimizer,train_iter, en_size, args.grad_clip, DE, EN)
+        val_loss = evaluate(seq2seq, val_iter, en_size, DE, EN)
+        now_time = time.time()
+        print("[Epoch:{}] val_loss:{} | val_pp:{} | Time: {}h{}m{}s".format(epoch, val_loss, math.exp(val_loss), (now_time - start_time) // 3600,
+                  (now_time - start_time) % 3600 // 60, (now_time - start_time) % 60))
 
-
+        if not best_val_loss or val_loss < best_val_loss:
+            print("Saving model ......")
+            if not os.path.isdir(".save"):
+                os.makedirs(".save")
+            torch.save(seq2seq.state_dict(), './.save/seq2seq_%d.pt' % (epoch))
+            best_val_loss = val_loss
+    test_loss = evaluate(seq2seq, test_iter, en_size, DE, EN)
+    print("[TEST] loss:{}".format(test_loss))

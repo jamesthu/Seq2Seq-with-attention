@@ -6,10 +6,11 @@ Created on 2018/10/23
 '''
 
 import spacy
+import torch
 from torchtext.data import Field, BucketIterator
 from torchtext.datasets import Multi30k
 
-device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
 
 def load_dataset(batch_size):
@@ -33,6 +34,6 @@ def load_dataset(batch_size):
         (train, val, test), batch_size=batch_size, repeat=False)
     return train_iter, val_iter, test_iter, DE, EN
 
-a = load_dataset(32)
-for i in a[0]:
-    print(i)
+# a = load_dataset(32)
+# for i in a[0]:
+#     print(i)
