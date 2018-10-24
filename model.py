@@ -66,7 +66,6 @@ class AttentionDecoder(nn.Module):
         return output, hidden_i
 
 
-
 class Seq2Seq(nn.Module):
     def __init__(self, encoder, decoder):
         super(Seq2Seq, self).__init__()
