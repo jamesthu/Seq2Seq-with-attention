@@ -40,7 +40,7 @@ class AttentionDecoder(nn.Module):
         self.v = torch.randn(hidden_size, requires_grad=True).to(device)
         self.attention_combined = nn.Linear(hidden_size * 2 + embed_size, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size, dropout=dropout)
-        self.out_layer = nn.Linear(hidden_size * 3 + embed_size, output_size)
+        self.out_layer = nn.Linear(hidden_size * 3, output_size)
 
     def forward(self, input, hidden, encoder_outputs):
         time_steps = encoder_outputs.size(0)
@@ -59,9 +59,9 @@ class AttentionDecoder(nn.Module):
         # [1, B, 2H + E] -> [1, B, H]
         attn_combined = self.attention_combined(torch.cat((context.transpose(0, 1), embedded), 2))
         # [1, B, H], [1, B, H]
-        _, hidden_i = self.gru(attn_combined, hidden)
-        # [1, B, 3H + E] -> [1, B, O] -> [B, O]
-        output = self.out_layer(torch.cat((hidden, embedded, context.transpose(0, 1)), 2)).squeeze(0)
+        output, hidden_i = self.gru(attn_combined, hidden)
+        # [1, B, 3H] -> [1, B, O] -> [B, O]
+        output = self.out_layer(torch.cat((output, context.transpose(0, 1)), 2)).squeeze(0)
         output = F.log_softmax(output, dim=1)
         return output, hidden_i
 
