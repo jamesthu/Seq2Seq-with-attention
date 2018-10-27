@@ -51,7 +51,7 @@ class AttentionDecoder(nn.Module):
         # [H] -> [L, H, 1]
         v = self.v.repeat(time_steps, 1).unsqueeze(2)
         # [L, B, 3H] -> [L, B, H] * [L, H, 1] = [L, B, 1] -> [L, B]
-        energies = self.attention(torch.cat((h, encoder_outputs), 2)).bmm(v).squeeze(2)
+        energies = F.tanh(self.attention(torch.cat((h, encoder_outputs), 2))).bmm(v).squeeze(2)
         # [L, B]
         attn_weights = F.softmax(energies, dim=0)
         # [L, B] -> [B, 1, L] * [B, L, 2H] = [B, 1, 2H]
